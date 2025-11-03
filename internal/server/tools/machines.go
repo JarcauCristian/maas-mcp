@@ -18,7 +18,7 @@ import (
 type Machines struct{}
 
 func (Machines) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, CommissionMachine{}}
+	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, CommissionMachine{}, DeployMachine{}, TestMachine{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)

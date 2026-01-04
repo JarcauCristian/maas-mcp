@@ -39,6 +39,7 @@ func registerTools(mcpServer *server.MCPServer) {
 		tools.Machines{},
 		tools.Power{},
 		tools.Templates{},
+		tools.Commands{},
 		tags.Tags{},
 		tags.Tag{},
 		subnets.Subnets{},

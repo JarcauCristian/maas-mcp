@@ -6,11 +6,33 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/vault-client-go"
 	"github.com/hashicorp/vault-client-go/schema"
 )
+
+var (
+	vlt    *Vault
+	vltErr error
+	once   sync.Once
+)
+
+func getVault() (*Vault, error) {
+	once.Do(func() {
+		vlt, vltErr = NewVault()
+	})
+	return vlt, vltErr
+}
+
+func MustVault() *Vault {
+	client, err := getVault()
+	if err != nil {
+		panic(fmt.Errorf("failed to initialize MAAS client: %w", err))
+	}
+	return client
+}
 
 type Vault struct {
 	client   *vault.Client
@@ -20,16 +42,26 @@ type Vault struct {
 	secretId string
 }
 
-func NewVault(baseUrl url.URL, roleName string) (*Vault, error) {
+func NewVault() (*Vault, error) {
 	ctx := context.Background()
-	roleId := os.Getenv("ROLE_ID")
+	roleId := os.Getenv("VAULT_ROLE_ID")
 	if roleId == "" {
-		return nil, errors.New("Environment ROLE_ID required, but is empty.")
+		return nil, errors.New("Environment VAULT_ROLE_ID required, but is empty.")
 	}
 
-	secretId := os.Getenv("SECRET_ID")
+	secretId := os.Getenv("VAULT_SECRET_ID")
 	if secretId == "" {
-		return nil, errors.New("Environment SECRET_ID required, but is empty.")
+		return nil, errors.New("Environment VAULT_SECRET_ID required, but is empty.")
+	}
+
+	baseUrl, err := url.Parse(os.Getenv("VAULT_BASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+
+	role_name := os.Getenv("VAULT_ROLE_NAME")
+	if role_name == "" {
+		return nil, errors.New("Environment VAULT_ROLE_NAME required, but is empty.")
 	}
 
 	client, err := vault.New(
@@ -76,7 +108,7 @@ func (v *Vault) GetSshKey(ctx context.Context) (string, error) {
 		return "", errors.New("There is no data field in response.")
 	}
 
-	publicKey, ok := data.(map[string]any)["public_key"]
+	publicKey, ok := data.(map[string]any)["private_key"]
 	if !ok {
 		return "", errors.New("There is no public_key field in data.")
 	}

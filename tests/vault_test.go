@@ -10,20 +10,15 @@ import (
 	"github.com/JarcauCristian/ztp-mcp/internal/server/vault"
 )
 
-const BASE_URL = "http://192.168.122.100:8200"
-
 func TestNewVault_Integration(t *testing.T) {
-	// TODO: Fix this test to work with any vault instances instead of being hardcoded.
-	baseUrl, _ := url.Parse(BASE_URL)
-	_, err := vault.NewVault(*baseUrl, "agent1")
+	_, err := vault.NewVault()
 	if err != nil {
 		t.Errorf("Failed to create vault: %v", err)
 	}
 }
 
 func TestGetSshKey_Integration(t *testing.T) {
-	baseUrl, _ := url.Parse(BASE_URL)
-	v, err := vault.NewVault(*baseUrl, "agent1")
+	v, err := vault.NewVault()
 	if err != nil {
 		t.Errorf("Failed to create vault: %v", err)
 	}
@@ -43,8 +38,7 @@ func TestNewVault_MissingRoleID(t *testing.T) {
 	os.Unsetenv("ROLE_ID")
 	os.Unsetenv("SECRET_ID")
 
-	baseUrl, _ := url.Parse("http://localhost:8200")
-	_, err := vault.NewVault(*baseUrl, "test")
+	_, err := vault.NewVault()
 	if err == nil {
 		t.Error("Expected error for missing ROLE_ID")
 	}
@@ -57,8 +51,7 @@ func TestNewVault_MissingSecretID(t *testing.T) {
 	os.Setenv("ROLE_ID", "test")
 	os.Unsetenv("SECRET_ID")
 
-	baseUrl, _ := url.Parse("http://localhost:8200")
-	_, err := vault.NewVault(*baseUrl, "test")
+	_, err := vault.NewVault()
 	if err == nil {
 		t.Error("Expected error for missing SECRET_ID")
 	}

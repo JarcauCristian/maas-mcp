@@ -13,6 +13,7 @@ import (
 	"github.com/JarcauCristian/ztp-mcp/internal/server/tools/subnets"
 	"github.com/JarcauCristian/ztp-mcp/internal/server/tools/tags"
 	"github.com/JarcauCristian/ztp-mcp/internal/server/tools/vlans"
+	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -78,6 +79,11 @@ func main() {
 		server.WithToolCapabilities(true),
 		server.WithResourceCapabilities(true, true),
 	)
+
+	if err := godotenv.Load(".env"); err != nil {
+		zap.L().Fatal("Failed to load environment variables from .env...")
+		os.Exit(1)
+	}
 
 	registerTools(mcpServer)
 

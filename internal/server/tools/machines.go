@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/JarcauCristian/ztp-mcp/internal/server/maas_client"
@@ -18,7 +19,7 @@ import (
 type Machines struct{}
 
 func (Machines) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, CommissionMachine{}, DeployMachine{}, TestMachine{}}
+	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, CommissionMachine{}, GetMachineIp{}, DeployMachine{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)
@@ -162,6 +163,112 @@ func (ListMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*mc
 	return mcp.NewToolResultText(string(jsonData)), nil
 }
 
+type GetMachineIp struct{}
+
+func (GetMachineIp) Create() mcp.Tool {
+	return mcp.NewTool(
+		"get_machine_ip",
+		mcp.WithString(
+			"id",
+			mcp.Required(),
+			mcp.Pattern("^[0-9a-z]{6}$"),
+			mcp.Description("The id of the machine to commission."),
+		),
+		mcp.WithDescription("Retrieve the main IP of the machine specified by id."),
+	)
+}
+
+func (GetMachineIp) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var errMsg string
+	machineID, err := request.RequireString("id")
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("[GetMachineIp] Required parameter id not present err=%v", err))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	path := fmt.Sprintf("/MAAS/api/2.0/nodes/%s/interfaces/", machineID)
+	client := maas_client.MustClient()
+
+	interfacesRaw, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
+	if err != nil {
+		errMsg = fmt.Sprintf("Failed to retrieve the interfaces of the machine with id %s err=%v", machineID, err)
+		zap.L().Error(fmt.Sprintf("[GetMachineIp] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	var interfaces []map[string]any
+	if err := json.Unmarshal([]byte(interfacesRaw), &interfaces); err != nil {
+		zap.L().Error(fmt.Sprintf("[GetMachineIp] %s", err.Error()))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	ipv4Regex := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
+
+	// Filter all the interfaces that are physical and without parents.
+	var filteredInterfaces []map[string]any
+	for _, iface := range interfaces {
+		interfaceType, ok := iface["type"].(string)
+		if !ok || interfaceType != "physical" {
+			continue
+		}
+
+		parents, ok := iface["parents"].([]any)
+		if ok && len(parents) > 0 {
+			continue
+		}
+
+		filteredInterfaces = append(filteredInterfaces, iface)
+	}
+
+	if len(filteredInterfaces) == 0 {
+		errMsg = fmt.Sprintf("No physical interfaces without parents found for machine %s", machineID)
+		zap.L().Error(fmt.Sprintf("[GetMachineIp] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	firstInterface := filteredInterfaces[0]
+	links, ok := firstInterface["links"].([]any)
+	if !ok || len(links) == 0 {
+		errMsg = fmt.Sprintf("No links found for the interface on machine %s", machineID)
+		zap.L().Error(fmt.Sprintf("[GetMachineIp] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	var ipAddress string
+	for _, link := range links {
+		linkMap, ok := link.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		ip, ok := linkMap["ip_address"].(string)
+		if !ok || ip == "" {
+			continue
+		}
+
+		if ipv4Regex.MatchString(ip) {
+			ipAddress = ip
+			break
+		}
+	}
+
+	if ipAddress == "" {
+		errMsg = fmt.Sprintf("No valid IPv4 address found for machine %s", machineID)
+		zap.L().Error(fmt.Sprintf("[GetMachineIp] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	output := struct {
+		IpAddress string `json:"ip_address"`
+		MachineId string `json:"machine_id"`
+	}{
+		IpAddress: ipAddress,
+		MachineId: machineID,
+	}
+
+	return mcp.NewToolResultStructured(output, fmt.Sprintf(`{"ip_address": "%s", "machine_id": "%s"}`, output.IpAddress, output.MachineId)), nil
+}
+
 type CommissionMachine struct{}
 
 func (CommissionMachine) Create() mcp.Tool {
@@ -290,83 +397,6 @@ func (DeployMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*
 	if err != nil {
 		errMsg = fmt.Sprintf("failed to marshal result: %v", err)
 		zap.L().Error(fmt.Sprintf("[DeployMachine] %s", errMsg))
-		return mcp.NewToolResultError(errMsg), nil
-	}
-
-	return mcp.NewToolResultText(string(jsonData)), nil
-}
-
-type TestMachine struct{}
-
-func (TestMachine) Create() mcp.Tool {
-	return mcp.NewTool(
-		"test_machine",
-		mcp.WithString(
-			"system_id",
-			mcp.Required(),
-			mcp.Pattern("^[0-9a-z]{6}$"),
-			mcp.Description("The id of the machine to retrieve information for."),
-		),
-		mcp.WithBoolean(
-			"enable_ssh",
-			mcp.Description("Whether to enable SSH for the testing environment using the user's SSH key(s). 0 = false. 1 = true."),
-		),
-		mcp.WithString(
-			"parameters",
-			mcp.Description("Scripts selected to run may define their own parameters. These parameters may be passed using the parameter name. Optionally a parameter may have the script name prepended to have that parameter only apply to that specific script."),
-		),
-		mcp.WithString(
-			"testing_scripts",
-			mcp.Pattern("^[^,]+(?:,[^,]+)*$"),
-			mcp.Description("A comma-separated list of testing script names and tags to be run. By default all tests tagged 'commissioning' will be run."),
-		),
-		mcp.WithToolAnnotation(CreateToolAnnotation("Test Machine", false, true, false, true)),
-		mcp.WithDescription("Tool used to test the machine with the specified testing scripts."),
-	)
-}
-
-func (TestMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	var errMsg string
-
-	systemID, err := request.RequireString("system_id")
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("[TestMachine] Required parameter system_id not present err=%v", err))
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-
-	path := fmt.Sprintf("/MAAS/api/2.0/machines/%s/op-test", systemID)
-
-	form := make(url.Values)
-
-	enableSSH := request.GetBool("enable_ssh", false)
-	if enableSSH {
-		form.Add("enable_ssh", "1")
-	} else {
-		form.Add("enable_ssh", "0")
-	}
-
-	if parameters := request.GetString("parameters", ""); parameters != "" {
-		form.Add("parameters", parameters)
-	}
-
-	if testingScripts := request.GetString("testing_scripts", ""); testingScripts != "" {
-		form.Add("testing_scripts", testingScripts)
-	}
-
-	client := maas_client.MustClient()
-
-	zap.L().Info(fmt.Sprintf("[TestMachine] Testing machine with system ID %s...", systemID))
-	resultData, err := client.Do(ctx, maas_client.RequestTypePost, path, strings.NewReader(form.Encode()))
-	if err != nil {
-		errMsg = fmt.Sprintf("Failed to test machine with system ID %s err=%v", systemID, err)
-		zap.L().Error(fmt.Sprintf("[TestMachine] %s", errMsg))
-		return mcp.NewToolResultError(errMsg), nil
-	}
-
-	jsonData, err := json.Marshal(resultData)
-	if err != nil {
-		errMsg = fmt.Sprintf("failed to marshal result: %v", err)
-		zap.L().Error(fmt.Sprintf("[TestMachine] %s", errMsg))
 		return mcp.NewToolResultError(errMsg), nil
 	}
 

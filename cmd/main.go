@@ -1,9 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
-	"os"
 	"runtime/debug"
 
 	"github.com/JarcauCristian/ztp-mcp/internal/server/middleware"
@@ -64,6 +64,13 @@ func main() {
 		version = info.Main.Version
 	}
 
+	mcpTransportRaw := flag.String("mcp-transport", "stdio", "MCP transport to use when strating the server.")
+	mcpAddressRaw := flag.String("mcp-address", "localhost:8080", "MCP address in the form of <host>:<port> for SSE and HTTP transport modes.")
+	flag.Parse()
+
+	mcpTransport := *mcpTransportRaw
+	mcpAddress := *mcpAddressRaw
+
 	mcpServer := server.NewMCPServer(
 		"Zero-Touch Provisioning MPC Server",
 		version,
@@ -74,27 +81,25 @@ func main() {
 
 	registerTools(mcpServer)
 
-	transport := os.Getenv("MCP_TRANSPORT")
-	addr := os.Getenv("MCP_ADDRESS")
-	switch transport {
+	switch mcpTransport {
 	case "SSE", "sse":
 		zap.L().Info("Starting MCP server in SSE mode...")
 		sseServer := server.NewSSEServer(mcpServer)
-		if err := sseServer.Start(addr); err != nil {
+		if err := sseServer.Start(mcpAddress); err != nil {
 			zap.L().Fatal(err.Error())
 		}
 	case "HTTP", "http":
-		zap.L().Info(fmt.Sprintf("Starting MCP server in Streamable HTTP mode on %s...", addr))
+		zap.L().Info(fmt.Sprintf("Starting MCP server in Streamable HTTP mode on %s...", mcpAddress))
 
 		mux := http.NewServeMux()
 
 		mux.Handle("/mcp", server.NewStreamableHTTPServer(mcpServer))
 		handler := middleware.Logging(middleware.Auth(mux))
 
-		if err := http.ListenAndServe(addr, handler); err != nil {
+		if err := http.ListenAndServe(mcpAddress, handler); err != nil {
 			zap.L().Fatal(err.Error())
 		}
-	default:
+	case "STDIO", "stdio":
 		zap.L().Info("Starting MCP server in stdio mode...")
 		if err := server.ServeStdio(mcpServer); err != nil {
 			zap.L().Fatal(err.Error())

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime/debug"
 
 	"github.com/JarcauCristian/ztp-mcp/internal/server/middleware"

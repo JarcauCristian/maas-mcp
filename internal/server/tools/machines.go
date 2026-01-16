@@ -339,7 +339,7 @@ func (DeployMachine) Create() mcp.Tool {
 		mcp.WithString(
 			"templateParameters",
 			mcp.Required(),
-			mcp.Description("The parameters that will be used to replace the values in the templates. They are represented as a JSON valid object. If the template does not require parameters enter an empty JSON map {}."),
+			mcp.Description("The parameters that will be used to replace the values in the templates. They are represented as a valid JSON object. If the template does not require parameters enter an empty JSON dictionary {}."),
 		),
 		mcp.WithDescription("Deploys a machine with the specified id and template."),
 	)

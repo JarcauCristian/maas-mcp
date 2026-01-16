@@ -51,10 +51,10 @@ push_to_vault() {
 }
 
 main() {
-  create_system_account || exit #?
-  create_ssh_key || exit #?
-  ensure_vault || exit #?
-  push_to_vault || exit #?
+  create_system_account || exit $?
+  create_ssh_key || exit $?
+  ensure_vault || exit $?
+  push_to_vault || exit $?
 }
 
 if [ "$EUID" -ne 0 ]; then
@@ -62,4 +62,4 @@ if [ "$EUID" -ne 0 ]; then
   exit
 fi
 
-main || exit #?
+main || exit $?

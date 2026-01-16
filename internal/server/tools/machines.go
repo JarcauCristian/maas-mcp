@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -19,7 +20,7 @@ import (
 type Machines struct{}
 
 func (Machines) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, CommissionMachine{}, GetMachineIp{}, DeployMachine{}}
+	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineIp{}, CommissionMachine{}, DeployMachine{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)
@@ -338,7 +339,7 @@ func (DeployMachine) Create() mcp.Tool {
 		mcp.WithString(
 			"templateParameters",
 			mcp.Required(),
-			mcp.Description("The parameters that will be used to replace the values in the templates. They are represented as a JSON valid object. If the template does not require parameters enter an empty JSON map {}."),
+			mcp.Description("The parameters that will be used to replace the values in the templates. They are represented as a valid JSON object. If the template does not require parameters enter an empty JSON dictionary {}."),
 		),
 		mcp.WithDescription("Deploys a machine with the specified id and template."),
 	)
@@ -368,6 +369,10 @@ func (DeployMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*
 	templateExecutor, err := templates.RetrieveExecutor(templateId, parameters)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("[DeployMachine] Failed to retrieve the template executor for parameters %s.", parameters))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	if err := os.Setenv("MACHINE_ID", machineId); err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 

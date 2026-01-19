@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"os"
 	"runtime/debug"
 
 	"github.com/JarcauCristian/ztp-mcp/internal/server/middleware"
@@ -82,8 +81,7 @@ func main() {
 	)
 
 	if err := godotenv.Load(".env"); err != nil {
-		zap.L().Fatal("Failed to load environment variables from .env...")
-		os.Exit(1)
+		zap.L().Warn("Failed to load environment variables from .env. Using the envs in environ...")
 	}
 
 	registerTools(mcpServer)

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/JarcauCristian/ztp-mcp/internal/server/maas_client"
@@ -16,6 +17,26 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 	"go.uber.org/zap"
 )
+
+var statuses = []string{
+	"new",
+	"commissioning",
+	"failed_commissioning",
+	"ready",
+	"deploying",
+	"deployed",
+	"releasing",
+	"failed_deployment",
+	"allocated",
+	"retired",
+	"broken",
+	"recommissioning",
+	"testing",
+	"failed_testing",
+	"rescuing",
+	"disk_erasing",
+	"failed_disk_erasing",
+}
 
 type Machines struct{}
 
@@ -64,7 +85,7 @@ func (ListMachines) Handle(ctx context.Context, request mcp.CallToolRequest) (*m
 
 	status := request.GetString("status", "")
 
-	if status == "" {
+	if status == "" || !slices.Contains(statuses, status) {
 		path = "/MAAS/api/2.0/machines/"
 	} else {
 		path = fmt.Sprintf("/MAAS/api/2.0/machines/?status=%s", status)

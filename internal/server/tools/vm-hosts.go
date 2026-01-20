@@ -30,7 +30,6 @@ type ListVMHosts struct{}
 func (ListVMHosts) Create() mcp.Tool {
 	return mcp.NewTool(
 		"list_vm_hosts",
-		mcp.WithInputSchema[struct{}](),
 		mcp.WithDescription("Returns the available VM hosts from the ZTP agent conected."),
 	)
 }

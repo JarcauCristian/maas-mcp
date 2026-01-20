@@ -41,7 +41,7 @@ var statuses = []string{
 type Machines struct{}
 
 func (Machines) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineIp{}, CommissionMachine{}, DeployMachine{}}
+	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineStatus{}, GetMachineIp{}, CommissionMachine{}, DeployMachine{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)
@@ -76,7 +76,7 @@ func (ListMachines) Create() mcp.Tool {
 			),
 			mcp.Description("The status of the machine that will be retrieved. Returns all machines if not provided."),
 		),
-		mcp.WithDescription("List all the available machines on the current ZTP agent conected."),
+		mcp.WithDescription("List all the available machines on the current ZTP agent connected."),
 	)
 }
 
@@ -183,6 +183,58 @@ func (ListMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+type GetMachineStatus struct{}
+
+func (GetMachineStatus) Create() mcp.Tool {
+	return mcp.NewTool(
+		"get_machine_status",
+		mcp.WithString(
+			"id",
+			mcp.Required(),
+			mcp.Pattern("^[0-9a-z]{6}$"),
+			mcp.Description("The id of the machine to commission."),
+		),
+		mcp.WithDescription("Retrieve the status of the machine specified by id."),
+	)
+}
+
+func (GetMachineStatus) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var errMsg string
+
+	machineID, err := request.RequireString("id")
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("[GetMachineStatus] Required parameter id not present err=%v", err))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	path := fmt.Sprintf("/MAAS/api/2.0/machines/%s/", machineID)
+	client := maas_client.MustClient()
+
+	zap.L().Info(fmt.Sprintf("[GetMachineStatus] Retrieving status for machine with id %s...", machineID))
+	machineRaw, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
+	if err != nil {
+		errMsg = fmt.Sprintf("Failed to retrieve the machine with id %s err=%v", machineID, err)
+		zap.L().Error(fmt.Sprintf("[GetMachineStatus] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	var machine map[string]any
+	if err := json.Unmarshal([]byte(machineRaw), &machine); err != nil {
+		errMsg = fmt.Sprintf("Failed to unmarshal the result: %v", err)
+		zap.L().Error(fmt.Sprintf("[GetMachineStatus] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	statusName, ok := machine["status_name"].(string)
+	if !ok {
+		errMsg = fmt.Sprintf("Failed to get status_name for machine %s", machineID)
+		zap.L().Error(fmt.Sprintf("[GetMachineStatus] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf(`{"status": "%s"}`, statusName)), nil
 }
 
 type GetMachineIp struct{}

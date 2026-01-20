@@ -76,6 +76,11 @@ func (ListMachines) Create() mcp.Tool {
 			),
 			mcp.Description("The status of the machine that will be retrieved. Returns all machines if not provided."),
 		),
+		mcp.WithBoolean(
+			"short_output",
+			mcp.DefaultBool(true),
+			mcp.Description("If true will output the short version of the machine output."),
+		),
 		mcp.WithDescription("List all the available machines on the current ZTP agent connected."),
 	)
 }
@@ -84,6 +89,7 @@ func (ListMachines) Handle(ctx context.Context, request mcp.CallToolRequest) (*m
 	var path, errMsg string
 
 	status := request.GetString("status", "")
+	shortOutput := request.GetBool("short_output", true)
 
 	if status == "" || !slices.Contains(statuses, status) {
 		path = "/MAAS/api/2.0/machines/"
@@ -101,9 +107,8 @@ func (ListMachines) Handle(ctx context.Context, request mcp.CallToolRequest) (*m
 		return mcp.NewToolResultError(errMsg), nil
 	}
 
-	var machines []map[string]any
-
-	err = json.Unmarshal([]byte(resultData), &machines)
+	var rawMachines []map[string]any
+	err = json.Unmarshal([]byte(resultData), &rawMachines)
 	if err != nil {
 		errMsg = fmt.Sprintf("Failed to unmarshal the result err=%v", err)
 		zap.L().Error(fmt.Sprintf("[ListMachines] %s", errMsg))
@@ -111,14 +116,24 @@ func (ListMachines) Handle(ctx context.Context, request mcp.CallToolRequest) (*m
 	}
 
 	// Filter out machines with the "protected" tag
-	var filteredMachines []map[string]any
-	for _, machine := range machines {
+	var filteredRawMachines []map[string]any
+	for _, machine := range rawMachines {
 		if !parser.CheckForProtectedTag(machine) {
-			filteredMachines = append(filteredMachines, machine)
+			filteredRawMachines = append(filteredRawMachines, machine)
 		}
 	}
 
-	response, err := json.Marshal(filteredMachines)
+	var response []byte
+	if shortOutput {
+		var shortMachines []Machine
+		for _, raw := range filteredRawMachines {
+			shortMachines = append(shortMachines, convertToMachine(raw))
+		}
+		response, err = json.Marshal(shortMachines)
+	} else {
+		response, err = json.Marshal(filteredRawMachines)
+	}
+
 	if err != nil {
 		errMsg = fmt.Sprintf("Failed to marshal filtered machines: %v", err)
 		zap.L().Error(fmt.Sprintf("[ListMachines] %s", errMsg))
@@ -139,13 +154,19 @@ func (ListMachine) Create() mcp.Tool {
 			mcp.Pattern("^[0-9a-z]{6}$"),
 			mcp.Description("The id of the machine to retrieve information for."),
 		),
+		mcp.WithBoolean(
+			"short_output",
+			mcp.DefaultBool(true),
+			mcp.Description("If true will output the short version of the machine output."),
+		),
 		mcp.WithDescription("Return the information about a particular machine."),
 	)
 }
 
 func (ListMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var errMsg string
-	jsonData := make([]byte, 0)
+
+	shortOutput := request.GetBool("short_output", true)
 
 	machineID, err := request.RequireString("id")
 	if err != nil {
@@ -165,24 +186,33 @@ func (ListMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*mc
 		return mcp.NewToolResultError(errMsg), nil
 	}
 
-	var machine map[string]any
-	err = json.Unmarshal([]byte(resultData), &machine)
+	var rawMachine map[string]any
+	err = json.Unmarshal([]byte(resultData), &rawMachine)
 	if err != nil {
 		errMsg = fmt.Sprintf("Failed to unmarshal the result: %v", err)
 		zap.L().Error(fmt.Sprintf("[ListMachine] %s", errMsg))
 		return mcp.NewToolResultError(errMsg), nil
 	}
 
-	if !parser.CheckForProtectedTag(machine) {
-		jsonData, err = json.Marshal(resultData)
-		if err != nil {
-			errMsg = fmt.Sprintf("failed to marshal result: %v", err)
-			zap.L().Error(fmt.Sprintf("[ListMachine] %s", errMsg))
-			return mcp.NewToolResultError(errMsg), nil
-		}
+	if parser.CheckForProtectedTag(rawMachine) {
+		return mcp.NewToolResultError("Machine is protected and cannot be accessed"), nil
 	}
 
-	return mcp.NewToolResultText(string(jsonData)), nil
+	var response []byte
+	if shortOutput {
+		machine := convertToMachine(rawMachine)
+		response, err = json.Marshal(machine)
+	} else {
+		response, err = json.Marshal(rawMachine)
+	}
+
+	if err != nil {
+		errMsg = fmt.Sprintf("Failed to marshal result: %v", err)
+		zap.L().Error(fmt.Sprintf("[ListMachine] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	return mcp.NewToolResultText(string(response)), nil
 }
 
 type GetMachineStatus struct{}
@@ -479,4 +509,167 @@ func (DeployMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*
 	}
 
 	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+func convertToMachine(raw map[string]any) Machine {
+	m := Machine{
+		SystemID:   getString(raw, "system_id"),
+		Hostname:   getString(raw, "hostname"),
+		FQDN:       getString(raw, "fqdn"),
+		StatusName: getString(raw, "status_name"),
+		PowerState: getString(raw, "power_state"),
+		Locked:     getBool(raw, "locked"),
+
+		Architecture: getString(raw, "architecture"),
+		CPUCount:     getInt(raw, "cpu_count"),
+		Memory:       getInt(raw, "memory"),
+		Storage:      getFloat(raw, "storage"),
+
+		OSSystem:     getString(raw, "osystem"),
+		DistroSeries: getString(raw, "distro_series"),
+
+		IPAddresses: getStringSlice(raw, "ip_addresses"),
+		TagNames:    getStringSlice(raw, "tag_names"),
+	}
+
+	if hwInfo, ok := raw["hardware_info"].(map[string]any); ok {
+		m.CPUModel = getString(hwInfo, "cpu_model")
+	}
+
+	if gateways, ok := raw["default_gateways"].(map[string]any); ok {
+		if ipv4, ok := gateways["ipv4"].(map[string]any); ok {
+			m.Gateway = getString(ipv4, "gateway_ip")
+		}
+	}
+
+	if zone, ok := raw["zone"].(map[string]any); ok {
+		m.Zone = getString(zone, "name")
+	}
+
+	if pool, ok := raw["pool"].(map[string]any); ok {
+		m.Pool = getString(pool, "name")
+	}
+
+	if bootIface, ok := raw["boot_interface"].(map[string]any); ok {
+		m.BootInterface = convertToInterface(bootIface)
+	}
+
+	if ifaceSet, ok := raw["interface_set"].([]any); ok {
+		for _, iface := range ifaceSet {
+			if ifaceMap, ok := iface.(map[string]any); ok {
+				m.Interfaces = append(m.Interfaces, *convertToInterface(ifaceMap))
+			}
+		}
+	}
+
+	if bootDisk, ok := raw["boot_disk"].(map[string]any); ok {
+		m.BootDisk = convertToBlockDevice(bootDisk)
+	}
+
+	if diskSet, ok := raw["blockdevice_set"].([]any); ok {
+		for _, disk := range diskSet {
+			if diskMap, ok := disk.(map[string]any); ok {
+				m.Disks = append(m.Disks, *convertToBlockDevice(diskMap))
+			}
+		}
+	}
+
+	return m
+}
+
+func convertToInterface(raw map[string]any) *Interface {
+	iface := &Interface{
+		Name:       getString(raw, "name"),
+		MACAddress: getString(raw, "mac_address"),
+	}
+
+	if vlan, ok := raw["vlan"].(map[string]any); ok {
+		iface.VLAN = getInt(vlan, "vid")
+	}
+
+	if links, ok := raw["links"].([]any); ok && len(links) > 0 {
+		if link, ok := links[0].(map[string]any); ok {
+			iface.IPAddress = getString(link, "ip_address")
+			if subnet, ok := link["subnet"].(map[string]any); ok {
+				iface.CIDR = getString(subnet, "cidr")
+			}
+		}
+	}
+
+	return iface
+}
+
+func convertToBlockDevice(raw map[string]any) *BlockDevice {
+	disk := &BlockDevice{
+		Name:   getString(raw, "name"),
+		Size:   getInt64(raw, "size"),
+		Model:  getString(raw, "model"),
+		Serial: getString(raw, "serial"),
+	}
+
+	if partitions, ok := raw["partitions"].([]any); ok {
+		for _, part := range partitions {
+			if partMap, ok := part.(map[string]any); ok {
+				p := Partition{
+					Path: getString(partMap, "path"),
+					Size: getInt64(partMap, "size"),
+				}
+				if fs, ok := partMap["filesystem"].(map[string]any); ok {
+					p.FSType = getString(fs, "fstype")
+					p.MountPoint = getString(fs, "mount_point")
+				}
+				disk.Partitions = append(disk.Partitions, p)
+			}
+		}
+	}
+
+	return disk
+}
+
+func getString(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+func getInt(m map[string]any, key string) int {
+	if v, ok := m[key].(float64); ok {
+		return int(v)
+	}
+	return 0
+}
+
+func getInt64(m map[string]any, key string) int64 {
+	if v, ok := m[key].(float64); ok {
+		return int64(v)
+	}
+	return 0
+}
+
+func getFloat(m map[string]any, key string) float64 {
+	if v, ok := m[key].(float64); ok {
+		return v
+	}
+	return 0
+}
+
+func getBool(m map[string]any, key string) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return false
+}
+
+func getStringSlice(m map[string]any, key string) []string {
+	if v, ok := m[key].([]any); ok {
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	}
+	return nil
 }

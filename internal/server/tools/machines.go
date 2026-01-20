@@ -267,7 +267,7 @@ func (GetMachineIp) Handle(ctx context.Context, request mcp.CallToolRequest) (*m
 		MachineId: machineID,
 	}
 
-	return mcp.NewToolResultStructured(output, fmt.Sprintf(`{"ip_address": "%s", "machine_id": "%s"}`, output.IpAddress, output.MachineId)), nil
+	return mcp.NewToolResultText(fmt.Sprintf(`{"ip_address": "%s", "machine_id": "%s"}`, output.IpAddress, output.MachineId)), nil
 }
 
 type CommissionMachine struct{}

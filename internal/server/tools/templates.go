@@ -38,16 +38,13 @@ func (RetrieveTemplates) Create() mcp.Tool {
 func (RetrieveTemplates) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var jsonData []byte
 	var errMsg string
+	var err error
+	templateStore := templates.MustTemplateStore()
 	onlyIDs := request.GetBool("only_ids", false)
 
 	if onlyIDs {
 		zap.L().Info("[RetrieveTemplates] Retrieving all template descriptions...")
-		descriptions, err := templates.Templates()
-		if err != nil {
-			errMsg = fmt.Sprintf("Failed to retrieve all the template descriptions: %v", err)
-			zap.L().Error(fmt.Sprintf("[RetrieveTemplates] %s", errMsg))
-			return mcp.NewToolResultError(errMsg), nil
-		}
+		descriptions := templateStore.ListDescriptions()
 
 		jsonData, err = json.Marshal(descriptions)
 		if err != nil {
@@ -57,13 +54,7 @@ func (RetrieveTemplates) Handle(ctx context.Context, request mcp.CallToolRequest
 		}
 	} else {
 		zap.L().Info("[RetrieveTemplates] Retrieving all template IDs...")
-		templateIDs, err := templates.TemplateIDs()
-		if err != nil {
-			errMsg = fmt.Sprintf("Failed to retrieve all the template ids: %v", err)
-			zap.L().Error(fmt.Sprintf("[RetrieveTemplates] %s", errMsg))
-			return mcp.NewToolResultError(errMsg), nil
-		}
-
+		templateIDs := templateStore.ListIDs()
 		jsonData, err = json.Marshal(templateIDs)
 		if err != nil {
 			errMsg = fmt.Sprintf("failed to marshal result: %v", err)
@@ -93,6 +84,8 @@ func (RetrieveTemplateById) Create() mcp.Tool {
 func (RetrieveTemplateById) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var errMsg string
 
+	templateStore := templates.MustTemplateStore()
+
 	templateId, err := request.RequireString("id")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("[RetrieveTemplateById] Required parameter id not present err=%v", err))
@@ -100,7 +93,7 @@ func (RetrieveTemplateById) Handle(ctx context.Context, request mcp.CallToolRequ
 	}
 
 	zap.L().Info(fmt.Sprintf("[RetrieveTemplateById] Retrieving template with id %s...", templateId))
-	descriptions, err := templates.Template(templateId)
+	descriptions, err := templateStore.GetDescription(templateId)
 	if err != nil {
 		errMsg = fmt.Sprintf("Failed to retrieve description for template with id %s: %v", templateId, err)
 		zap.L().Error(fmt.Sprintf("[RetrieveTemplateById] %s", errMsg))
@@ -135,6 +128,8 @@ func (RetrieveTemplateContents) Create() mcp.Tool {
 func (RetrieveTemplateContents) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	var errMsg string
 
+	templateStore := templates.MustTemplateStore()
+
 	templateId, err := request.RequireString("id")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("[RetrieveTemplateContents] Required parameter id not present err=%v", err))
@@ -142,7 +137,7 @@ func (RetrieveTemplateContents) Handle(ctx context.Context, request mcp.CallTool
 	}
 
 	zap.L().Info(fmt.Sprintf("[RetrieveTemplateContents] Retrieving template content for id %s...", templateId))
-	templateContent, err := templates.TemplateContent(templateId)
+	templateContent, err := templateStore.GetContent(templateId)
 	if err != nil {
 		errMsg = fmt.Sprintf("Failed to retrieve template content for id %s: %v", templateId, err)
 		zap.L().Error(fmt.Sprintf("[RetrieveTemplateContents] %s", errMsg))
@@ -163,6 +158,8 @@ func (CreateTemplate) Create() mcp.Tool {
 }
 
 func (CreateTemplate) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	templateStore := templates.MustTemplateStore()
+
 	argumentsJSON, err := json.Marshal(request.Params.Arguments)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to marshal arguments: %v", err)
@@ -179,7 +176,7 @@ func (CreateTemplate) Handle(ctx context.Context, request mcp.CallToolRequest) (
 
 	zap.L().Info(fmt.Sprintf("[CreateTemplate] Creating template with id: %s", genericTemplate.Id))
 
-	err = templates.CreateTemplate(genericTemplate)
+	err = templateStore.Create(genericTemplate)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create template for id %s: %v", genericTemplate.Id, err)
 		zap.L().Error(fmt.Sprintf("[CreateTemplate] %s", errMsg))
@@ -205,13 +202,14 @@ func (DeleteTemplate) Create() mcp.Tool {
 }
 
 func (DeleteTemplate) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	templateStore := templates.MustTemplateStore()
 	templateId, err := request.RequireString("id")
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("[Delete Template] %s", err.Error()))
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	err = templates.DeleteTemplate(templateId)
+	err = templateStore.Delete(templateId)
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("[Delete Template] %s", err.Error()))
 		return mcp.NewToolResultError(err.Error()), nil

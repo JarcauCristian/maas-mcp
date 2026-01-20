@@ -59,7 +59,7 @@ func Auth(next http.Handler) http.Handler {
 			return
 		}
 
-		r.Body.Close()
+		_ = r.Body.Close()
 
 		r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
 

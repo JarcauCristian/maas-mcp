@@ -1,9 +1,0 @@
-{
-  "id": "nginx_server",
-  "name": "Nginx Server",
-  "description": "Installs and starts NGINX and deploys a simple customizable landing page using template parameters.",
-  "parameters": {
-      "sitetitle": "Title for the default index page.",
-      "sitemessage": "Main message/content for the default index page."
-  }
-}

@@ -5,58 +5,73 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"text/template"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
+// TemplateExecutor executes a template with parameters
 type TemplateExecutor struct {
-	TemplateId string
-	Parameters map[string]any
+	store      *TemplateStore
+	templateID string
+	parameters map[string]any
 }
 
-func (t *TemplateExecutor) Execute() (string, error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to get current working directory err=%v", err))
-		return "", err
+// NewTemplateExecutor creates a new executor for the given template
+func NewTemplateExecutor(store *TemplateStore, templateID string, parameters string) (*TemplateExecutor, error) {
+	if !store.Exists(templateID) {
+		return nil, fmt.Errorf("template %s does not exist", templateID)
 	}
 
-	templatePath := filepath.Join(currentDir, "internal/server/templates", t.TemplateId, "template.yaml")
-
-	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-		zap.L().Error(fmt.Sprintf("Template file not found: %s", templatePath))
-		return "", fmt.Errorf("template file not found: %s", templatePath)
+	var params map[string]any
+	if err := json.Unmarshal([]byte(parameters), &params); err != nil {
+		return nil, fmt.Errorf("failed to parse parameters: %w", err)
 	}
 
-	tmpl, err := template.ParseFiles(templatePath)
+	zap.L().Info(fmt.Sprintf("Creating template executor for template: %s", templateID))
+
+	return &TemplateExecutor{
+		store:      store,
+		templateID: templateID,
+		parameters: params,
+	}, nil
+}
+
+// Execute renders the template with parameters and returns base64 encoded user data
+func (e *TemplateExecutor) Execute() (string, error) {
+	content, err := e.store.GetContent(e.templateID)
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to parse template file %s err=%v", templatePath, err))
+		zap.L().Error(fmt.Sprintf("Template not found: %s, err=%v", e.templateID, err))
+		return "", fmt.Errorf("template not found: %s", e.templateID)
+	}
+
+	tmpl, err := template.New(e.templateID).Parse(content)
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to parse template %s err=%v", e.templateID, err))
 		return "", err
 	}
 
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, t.Parameters)
-	if err != nil {
-		zap.L().Error(fmt.Sprintf("Failed to execute template %s err=%v", templatePath, err))
+	if err := tmpl.Execute(&buf, e.parameters); err != nil {
+		zap.L().Error(fmt.Sprintf("Failed to execute template %s err=%v", e.templateID, err))
 		return "", err
 	}
 
-	userData, err := t.injectScripts(buf.Bytes())
+	userData, err := e.injectScripts(buf.Bytes())
 	if err != nil {
 		zap.L().Error(fmt.Sprintf("Failed to inject scripts into user data err=%v", err))
 		return "", err
 	}
 
-	encodedStr := base64.StdEncoding.EncodeToString(userData)
-	return encodedStr, nil
+	return base64.StdEncoding.EncodeToString(userData), nil
 }
 
+// WriteFile represents a file entry in cloud-config
 type WriteFile struct {
 	Path        string `yaml:"path"`
 	Content     string `yaml:"content"`
@@ -65,12 +80,13 @@ type WriteFile struct {
 	Defer       bool   `yaml:"defer,omitempty"`
 }
 
+// CloudConfig represents a cloud-init configuration
 type CloudConfig struct {
 	WriteFiles []WriteFile    `yaml:"write_files,omitempty"`
 	Other      map[string]any `yaml:",inline"`
 }
 
-func (t *TemplateExecutor) injectScripts(userData []byte) ([]byte, error) {
+func (e *TemplateExecutor) injectScripts(userData []byte) ([]byte, error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current working directory: %w", err)
@@ -92,7 +108,7 @@ func (t *TemplateExecutor) injectScripts(userData []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to parse user data as YAML: %w", err)
 	}
 
-	templateVarRegex := regexp.MustCompile(`\{\{\s*\.(\w+)\s*\}\}`) // Regex use to get template values such as {{ .ValueName }}
+	templateVarRegex := regexp.MustCompile(`\{\{\s*\.(\w+)\s*\}\}`)
 
 	for _, scriptPath := range scriptFiles {
 		scriptContent, err := os.ReadFile(scriptPath)
@@ -148,39 +164,4 @@ func toEnvVarName(camelCase string) string {
 		result.WriteRune(r)
 	}
 	return strings.ToUpper(result.String())
-}
-
-func RetrieveExecutor(templateId string, parameters string) (*TemplateExecutor, error) {
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	templateDir := filepath.Join(currentDir, "internal/server/templates", templateId)
-
-	if _, err := os.Stat(templateDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("template id %v does not exist", templateId)
-	}
-
-	descriptionPath := filepath.Join(templateDir, "description.json")
-	if _, err := os.Stat(descriptionPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("template description not found for id %v", templateId)
-	}
-
-	templatePath := filepath.Join(templateDir, "template.yaml")
-	if _, err := os.Stat(templatePath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("template file not found for id %v", templateId)
-	}
-
-	var params map[string]any
-	if err := json.Unmarshal([]byte(parameters), &params); err != nil {
-		return nil, fmt.Errorf("failed to parse body: %v", err)
-	}
-
-	zap.L().Info(fmt.Sprintf("Creating generic template executor for template: %s", templateId))
-
-	return &TemplateExecutor{
-		TemplateId: templateId,
-		Parameters: params,
-	}, nil
 }

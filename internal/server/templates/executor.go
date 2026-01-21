@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -15,9 +16,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//go:embed scripts/*
+var scriptsInjectFS embed.FS
+
 // TemplateExecutor executes a template with parameters
 type TemplateExecutor struct {
 	store      *TemplateStore
+	scriptsFS  embed.FS
 	templateID string
 	parameters map[string]any
 }
@@ -37,6 +42,7 @@ func NewTemplateExecutor(store *TemplateStore, templateID string, parameters str
 
 	return &TemplateExecutor{
 		store:      store,
+		scriptsFS:  scriptsInjectFS,
 		templateID: templateID,
 		parameters: params,
 	}, nil
@@ -87,15 +93,18 @@ type CloudConfig struct {
 }
 
 func (e *TemplateExecutor) injectScripts(userData []byte) ([]byte, error) {
-	currentDir, err := os.Getwd()
+	// Read script files from the embedded filesystem
+	entries, err := e.scriptsFS.ReadDir("scripts")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current working directory: %w", err)
+		return nil, fmt.Errorf("failed to read scripts directory: %w", err)
 	}
 
-	scriptsDir := filepath.Join(currentDir, "scripts")
-	scriptFiles, err := filepath.Glob(filepath.Join(scriptsDir, "*.sh"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to glob scripts directory: %w", err)
+	// Filter for .sh files
+	var scriptFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sh") {
+			scriptFiles = append(scriptFiles, entry.Name())
+		}
 	}
 
 	if len(scriptFiles) == 0 {
@@ -110,10 +119,10 @@ func (e *TemplateExecutor) injectScripts(userData []byte) ([]byte, error) {
 
 	templateVarRegex := regexp.MustCompile(`\{\{\s*\.(\w+)\s*\}\}`)
 
-	for _, scriptPath := range scriptFiles {
-		scriptContent, err := os.ReadFile(scriptPath)
+	for _, scriptName := range scriptFiles {
+		scriptContent, err := e.scriptsFS.ReadFile(filepath.Join("scripts", scriptName))
 		if err != nil {
-			return nil, fmt.Errorf("failed to read script %s: %w", scriptPath, err)
+			return nil, fmt.Errorf("failed to read script %s: %w", scriptName, err)
 		}
 
 		renderedScript := templateVarRegex.ReplaceAllStringFunc(string(scriptContent), func(match string) string {
@@ -131,7 +140,6 @@ func (e *TemplateExecutor) injectScripts(userData []byte) ([]byte, error) {
 		})
 
 		encodedContent := base64.StdEncoding.EncodeToString([]byte(renderedScript))
-		scriptName := filepath.Base(scriptPath)
 		destPath := fmt.Sprintf("/var/lib/cloud/scripts/per-once/zzzz-%s", scriptName)
 
 		cloudConfig.WriteFiles = append(cloudConfig.WriteFiles, WriteFile{

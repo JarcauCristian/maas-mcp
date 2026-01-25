@@ -18,7 +18,7 @@ const NUMBER_PATTERN = "^[0-9]+$"
 type VMHosts struct{}
 
 func (VMHosts) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListVMHosts{}, ListVMHost{}, ComposeVM{}}
+	mcpTools := []MCPTool{ListVMHosts{}, ListVMHost{}, ListVirtualMachines{}, ComposeVM{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)
@@ -203,4 +203,122 @@ func (ComposeVM) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	}
 
 	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
+type ListVirtualMachines struct{}
+
+func (ListVirtualMachines) Create() mcp.Tool {
+	return mcp.NewTool(
+		"list-virtual-machines",
+		mcp.WithString(
+			"vm-host-id",
+			mcp.Pattern("^[0-9]+$"),
+			mcp.Description("The id of the VM host to search the VMs for."),
+		),
+		mcp.WithBoolean(
+			"all",
+			mcp.DefaultBool(true),
+			mcp.Description("If true return all virtual machines and ignore vm-host-id."),
+		),
+		mcp.WithDescription("Retrieve all the virtual machines from a specified VM host or all of them."),
+	)
+}
+
+func (l ListVirtualMachines) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var path string
+	var machines []map[string]any
+	vmHostId := request.GetString("vm-host-id", "")
+	all := request.GetBool("all", true)
+
+	if !all && vmHostId == "" {
+		return mcp.NewToolResultError("vm-host-id is required when all=false"), nil
+	}
+
+	client := maas_client.MustClient()
+	path = "/MAAS/api/2.0/machines/"
+
+	machinesRaw, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to retrieve machines from the MAAS host; err=%s", err.Error())), nil
+	}
+
+	err = json.Unmarshal([]byte(machinesRaw), &machines)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to unmarshal machines result; err=%s", err.Error())), nil
+	}
+
+	virtualMachines := l.parseMachineList(machines)
+	var output any
+	if all {
+		output = virtualMachines
+	} else {
+		if vms, ok := virtualMachines[vmHostId]; ok {
+			output = vms
+		} else {
+			output = []map[string]any{}
+		}
+	}
+
+	outputBytes, err := json.Marshal(output)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to marshal output: %v", err)), nil
+	}
+
+	return mcp.NewToolResultText(string(outputBytes)), nil
+}
+
+func (ListVirtualMachines) parseMachineList(machines []map[string]any) map[string][]map[string]any {
+	output := make(map[string][]map[string]any)
+	for _, machine := range machines {
+		vmData, podId, ok := extractVMData(machine)
+		if !ok {
+			continue
+		}
+
+		output[podId] = append(output[podId], vmData)
+	}
+
+	return output
+}
+
+func extractVMData(machine map[string]any) (vmData map[string]any, podId string, ok bool) {
+	vmId, ok := machine["virtualmachine_id"]
+	if !ok {
+		return nil, "", false
+	}
+
+	systemId, ok := machine["system_id"]
+	if !ok {
+		return nil, "", false
+	}
+
+	hostname, ok := machine["hostname"]
+	if !ok {
+		return nil, "", false
+	}
+
+	podRaw, ok := machine["pod"]
+	if !ok {
+		return nil, "", false
+	}
+
+	pod, ok := podRaw.(map[string]any)
+	if !ok {
+		return nil, "", false
+	}
+
+	podIdRaw, ok := pod["id"]
+	if !ok {
+		return nil, "", false
+	}
+
+	podId = fmt.Sprintf("%v", podIdRaw)
+
+	vmData = map[string]any{
+		"hostname":          hostname,
+		"virtualmachine_id": vmId,
+		"system_id":         systemId,
+	}
+
+	return vmData, podId, true
 }

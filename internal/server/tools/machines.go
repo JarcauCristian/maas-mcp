@@ -513,41 +513,41 @@ func (DeployMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*
 
 func convertToMachine(raw map[string]any) Machine {
 	m := Machine{
-		SystemID:   getString(raw, "system_id"),
-		Hostname:   getString(raw, "hostname"),
-		FQDN:       getString(raw, "fqdn"),
-		StatusName: getString(raw, "status_name"),
-		PowerState: getString(raw, "power_state"),
-		Locked:     getBool(raw, "locked"),
+		SystemID:   parser.GetString(raw, "system_id"),
+		Hostname:   parser.GetString(raw, "hostname"),
+		FQDN:       parser.GetString(raw, "fqdn"),
+		StatusName: parser.GetString(raw, "status_name"),
+		PowerState: parser.GetString(raw, "power_state"),
+		Locked:     parser.GetBool(raw, "locked"),
 
-		Architecture: getString(raw, "architecture"),
-		CPUCount:     getInt(raw, "cpu_count"),
-		Memory:       getInt(raw, "memory"),
-		Storage:      getFloat(raw, "storage"),
+		Architecture: parser.GetString(raw, "architecture"),
+		CPUCount:     parser.GetInt(raw, "cpu_count"),
+		Memory:       parser.GetInt(raw, "memory"),
+		Storage:      parser.GetFloat(raw, "storage"),
 
-		OSSystem:     getString(raw, "osystem"),
-		DistroSeries: getString(raw, "distro_series"),
+		OSSystem:     parser.GetString(raw, "osystem"),
+		DistroSeries: parser.GetString(raw, "distro_series"),
 
-		IPAddresses: getStringSlice(raw, "ip_addresses"),
-		TagNames:    getStringSlice(raw, "tag_names"),
+		IPAddresses: parser.GetStringSlice(raw, "ip_addresses"),
+		TagNames:    parser.GetStringSlice(raw, "tag_names"),
 	}
 
 	if hwInfo, ok := raw["hardware_info"].(map[string]any); ok {
-		m.CPUModel = getString(hwInfo, "cpu_model")
+		m.CPUModel = parser.GetString(hwInfo, "cpu_model")
 	}
 
 	if gateways, ok := raw["default_gateways"].(map[string]any); ok {
 		if ipv4, ok := gateways["ipv4"].(map[string]any); ok {
-			m.Gateway = getString(ipv4, "gateway_ip")
+			m.Gateway = parser.GetString(ipv4, "gateway_ip")
 		}
 	}
 
 	if zone, ok := raw["zone"].(map[string]any); ok {
-		m.Zone = getString(zone, "name")
+		m.Zone = parser.GetString(zone, "name")
 	}
 
 	if pool, ok := raw["pool"].(map[string]any); ok {
-		m.Pool = getString(pool, "name")
+		m.Pool = parser.GetString(pool, "name")
 	}
 
 	if bootIface, ok := raw["boot_interface"].(map[string]any); ok {
@@ -579,19 +579,19 @@ func convertToMachine(raw map[string]any) Machine {
 
 func convertToInterface(raw map[string]any) *Interface {
 	iface := &Interface{
-		Name:       getString(raw, "name"),
-		MACAddress: getString(raw, "mac_address"),
+		Name:       parser.GetString(raw, "name"),
+		MACAddress: parser.GetString(raw, "mac_address"),
 	}
 
 	if vlan, ok := raw["vlan"].(map[string]any); ok {
-		iface.VLAN = getInt(vlan, "vid")
+		iface.VLAN = parser.GetInt(vlan, "vid")
 	}
 
 	if links, ok := raw["links"].([]any); ok && len(links) > 0 {
 		if link, ok := links[0].(map[string]any); ok {
-			iface.IPAddress = getString(link, "ip_address")
+			iface.IPAddress = parser.GetString(link, "ip_address")
 			if subnet, ok := link["subnet"].(map[string]any); ok {
-				iface.CIDR = getString(subnet, "cidr")
+				iface.CIDR = parser.GetString(subnet, "cidr")
 			}
 		}
 	}
@@ -601,22 +601,22 @@ func convertToInterface(raw map[string]any) *Interface {
 
 func convertToBlockDevice(raw map[string]any) *BlockDevice {
 	disk := &BlockDevice{
-		Name:   getString(raw, "name"),
-		Size:   getInt64(raw, "size"),
-		Model:  getString(raw, "model"),
-		Serial: getString(raw, "serial"),
+		Name:   parser.GetString(raw, "name"),
+		Size:   parser.GetInt64(raw, "size"),
+		Model:  parser.GetString(raw, "model"),
+		Serial: parser.GetString(raw, "serial"),
 	}
 
 	if partitions, ok := raw["partitions"].([]any); ok {
 		for _, part := range partitions {
 			if partMap, ok := part.(map[string]any); ok {
 				p := Partition{
-					Path: getString(partMap, "path"),
-					Size: getInt64(partMap, "size"),
+					Path: parser.GetString(partMap, "path"),
+					Size: parser.GetInt64(partMap, "size"),
 				}
 				if fs, ok := partMap["filesystem"].(map[string]any); ok {
-					p.FSType = getString(fs, "fstype")
-					p.MountPoint = getString(fs, "mount_point")
+					p.FSType = parser.GetString(fs, "fstype")
+					p.MountPoint = parser.GetString(fs, "mount_point")
 				}
 				disk.Partitions = append(disk.Partitions, p)
 			}
@@ -624,52 +624,4 @@ func convertToBlockDevice(raw map[string]any) *BlockDevice {
 	}
 
 	return disk
-}
-
-func getString(m map[string]any, key string) string {
-	if v, ok := m[key].(string); ok {
-		return v
-	}
-	return ""
-}
-
-func getInt(m map[string]any, key string) int {
-	if v, ok := m[key].(float64); ok {
-		return int(v)
-	}
-	return 0
-}
-
-func getInt64(m map[string]any, key string) int64 {
-	if v, ok := m[key].(float64); ok {
-		return int64(v)
-	}
-	return 0
-}
-
-func getFloat(m map[string]any, key string) float64 {
-	if v, ok := m[key].(float64); ok {
-		return v
-	}
-	return 0
-}
-
-func getBool(m map[string]any, key string) bool {
-	if v, ok := m[key].(bool); ok {
-		return v
-	}
-	return false
-}
-
-func getStringSlice(m map[string]any, key string) []string {
-	if v, ok := m[key].([]any); ok {
-		result := make([]string, 0, len(v))
-		for _, item := range v {
-			if s, ok := item.(string); ok {
-				result = append(result, s)
-			}
-		}
-		return result
-	}
-	return nil
 }

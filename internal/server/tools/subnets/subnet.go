@@ -36,7 +36,7 @@ type ReadSubnet struct{}
 
 func (ReadSubnet) Create() mcp.Tool {
 	return mcp.NewTool(
-		"read_subnet",
+		"read-subnet",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -83,7 +83,7 @@ type UpdateSubnet struct{}
 
 func (UpdateSubnet) Create() mcp.Tool {
 	return mcp.NewTool(
-		"update_subnet",
+		"update-subnet",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -239,7 +239,7 @@ type DeleteSubnet struct{}
 
 func (DeleteSubnet) Create() mcp.Tool {
 	return mcp.NewTool(
-		"delete_subnet",
+		"delete-subnet",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -286,7 +286,7 @@ type SubnetIPAddresses struct{}
 
 func (SubnetIPAddresses) Create() mcp.Tool {
 	return mcp.NewTool(
-		"subnet_ip_addresses",
+		"subnet-ip-addresses",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -349,7 +349,7 @@ type SubnetReservedIPRanges struct{}
 
 func (SubnetReservedIPRanges) Create() mcp.Tool {
 	return mcp.NewTool(
-		"subnet_reserved_ip_ranges",
+		"subnet-reserved-ip-ranges",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -396,7 +396,7 @@ type SubnetStatistics struct{}
 
 func (SubnetStatistics) Create() mcp.Tool {
 	return mcp.NewTool(
-		"subnet_statistics",
+		"subnet-statistics",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -459,7 +459,7 @@ type SubnetUnreservedIPRanges struct{}
 
 func (SubnetUnreservedIPRanges) Create() mcp.Tool {
 	return mcp.NewTool(
-		"subnet_unreserved_ip_ranges",
+		"subnet-unreserved-ip-ranges",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

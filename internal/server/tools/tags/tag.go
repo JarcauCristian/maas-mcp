@@ -28,7 +28,7 @@ type DeleteTag struct{}
 
 func (DeleteTag) Create() mcp.Tool {
 	return mcp.NewTool(
-		"delete_tag",
+		"delete-tag",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -73,7 +73,7 @@ type ReadTag struct{}
 
 func (ReadTag) Create() mcp.Tool {
 	return mcp.NewTool(
-		"read_tag",
+		"read-tag",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -118,7 +118,7 @@ type UpdateTag struct{}
 
 func (UpdateTag) Create() mcp.Tool {
 	return mcp.NewTool(
-		"update_tag",
+		"update-tag",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -191,7 +191,7 @@ type ListByTag struct{}
 
 func (ListByTag) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_by_tag",
+		"list-by-tag",
 		mcp.WithString(
 			"name",
 			mcp.Required(),

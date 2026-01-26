@@ -28,7 +28,7 @@ type ListNodeScripts struct{}
 
 func (ListNodeScripts) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_node_scripts",
+		"list-node-scripts",
 		mcp.WithString(
 			"type",
 			mcp.Enum("commissioning", "testing", "release"),
@@ -101,7 +101,7 @@ type CreateNodeScript struct{}
 
 func (CreateNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"create_node_script",
+		"create-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),

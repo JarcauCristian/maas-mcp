@@ -30,7 +30,7 @@ type ListVlans struct{}
 
 func (ListVlans) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_vlans",
+		"list-vlans",
 		mcp.WithString(
 			"fabric_id",
 			mcp.Required(),
@@ -77,7 +77,7 @@ type CreateVlan struct{}
 
 func (CreateVlan) Create() mcp.Tool {
 	return mcp.NewTool(
-		"create_vlan",
+		"create-vlan",
 		mcp.WithString(
 			"fabric_id",
 			mcp.Required(),

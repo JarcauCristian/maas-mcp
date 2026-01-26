@@ -35,7 +35,7 @@ type DeleteNodeScript struct{}
 
 func (DeleteNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"delete_node_script",
+		"delete-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -81,7 +81,7 @@ type ReadNodeScript struct{}
 
 func (ReadNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"read_node_script",
+		"read-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -137,7 +137,7 @@ type UpdateNodeScript struct{}
 
 func (UpdateNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"update_node_script",
+		"update-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -304,7 +304,7 @@ type AddTagToNodeScript struct{}
 
 func (AddTagToNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"add_tag_to_node_script",
+		"add-tag-to-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -359,7 +359,7 @@ type DownloadNodeScript struct{}
 
 func (DownloadNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"download_node_script",
+		"download-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),
@@ -409,7 +409,7 @@ type RemoveTagFromNodeScript struct{}
 
 func (RemoveTagFromNodeScript) Create() mcp.Tool {
 	return mcp.NewTool(
-		"remove_tag_from_node_script",
+		"remove-tag-from-node-script",
 		mcp.WithString(
 			"name",
 			mcp.Required(),

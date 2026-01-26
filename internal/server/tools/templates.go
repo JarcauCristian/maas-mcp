@@ -25,7 +25,7 @@ type RetrieveTemplates struct{}
 
 func (RetrieveTemplates) Create() mcp.Tool {
 	return mcp.NewTool(
-		"retrieve_templates",
+		"retrieve-templates",
 		mcp.WithBoolean(
 			"only_ids",
 			mcp.DefaultBool(false),
@@ -70,7 +70,7 @@ type RetrieveTemplateById struct{}
 
 func (RetrieveTemplateById) Create() mcp.Tool {
 	return mcp.NewTool(
-		"retrieve_template_by_id",
+		"retrieve-template-by-id",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -114,7 +114,7 @@ type RetrieveTemplateContents struct{}
 
 func (RetrieveTemplateContents) Create() mcp.Tool {
 	return mcp.NewTool(
-		"retrieve_template_content",
+		"retrieve-template-content",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -151,7 +151,7 @@ type CreateTemplate struct{}
 
 func (CreateTemplate) Create() mcp.Tool {
 	return mcp.NewTool(
-		"create_template",
+		"create-template",
 		mcp.WithInputSchema[templates.GenericTemplate](),
 		mcp.WithDescription("Create and add a new template based on the html template files required: description.json and template.yaml."),
 	)
@@ -190,7 +190,7 @@ type DeleteTemplate struct{}
 
 func (DeleteTemplate) Create() mcp.Tool {
 	return mcp.NewTool(
-		"delete_template",
+		"delete-template",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

@@ -25,7 +25,7 @@ type PowerState struct{}
 
 func (PowerState) Create() mcp.Tool {
 	return mcp.NewTool(
-		"power_state",
+		"power-state",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -71,7 +71,7 @@ type ChangePowerState struct{}
 
 func (ChangePowerState) Create() mcp.Tool {
 	return mcp.NewTool(
-		"change_power_state",
+		"change-power-state",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

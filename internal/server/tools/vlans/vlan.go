@@ -28,7 +28,7 @@ type DeleteVlan struct{}
 
 func (DeleteVlan) Create() mcp.Tool {
 	return mcp.NewTool(
-		"delete_vlan",
+		"delete-vlan",
 		mcp.WithString(
 			"fabric_id",
 			mcp.Required(),
@@ -87,7 +87,7 @@ type ReadVlan struct{}
 
 func (ReadVlan) Create() mcp.Tool {
 	return mcp.NewTool(
-		"read_vlan",
+		"read-vlan",
 		mcp.WithString(
 			"fabric_id",
 			mcp.Required(),
@@ -146,7 +146,7 @@ type UpdateVlan struct{}
 
 func (UpdateVlan) Create() mcp.Tool {
 	return mcp.NewTool(
-		"update_vlan",
+		"update-vlan",
 		mcp.WithString(
 			"fabric_id",
 			mcp.Required(),

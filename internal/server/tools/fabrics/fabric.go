@@ -28,7 +28,7 @@ type DeleteFabric struct{}
 
 func (DeleteFabric) Create() mcp.Tool {
 	return mcp.NewTool(
-		"delete_fabric",
+		"delete-fabric",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -75,7 +75,7 @@ type ReadFabric struct{}
 
 func (ReadFabric) Create() mcp.Tool {
 	return mcp.NewTool(
-		"read_fabric",
+		"read-fabric",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -122,7 +122,7 @@ type UpdateFabric struct{}
 
 func (UpdateFabric) Create() mcp.Tool {
 	return mcp.NewTool(
-		"update_fabric",
+		"update-fabric",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

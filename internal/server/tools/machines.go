@@ -52,7 +52,7 @@ type ListMachines struct{}
 
 func (ListMachines) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_machines",
+		"list-machines",
 		mcp.WithString(
 			"status",
 			mcp.Enum(
@@ -147,7 +147,7 @@ type ListMachine struct{}
 
 func (ListMachine) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_machine",
+		"list-machine",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -219,7 +219,7 @@ type GetMachineStatus struct{}
 
 func (GetMachineStatus) Create() mcp.Tool {
 	return mcp.NewTool(
-		"get_machine_status",
+		"get-machine-status",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -271,7 +271,7 @@ type GetMachineIp struct{}
 
 func (GetMachineIp) Create() mcp.Tool {
 	return mcp.NewTool(
-		"get_machine_ip",
+		"get-machine-ip",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -377,7 +377,7 @@ type CommissionMachine struct{}
 
 func (CommissionMachine) Create() mcp.Tool {
 	return mcp.NewTool(
-		"commission_machine",
+		"commission-machine",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -426,7 +426,7 @@ type DeployMachine struct{}
 
 func (DeployMachine) Create() mcp.Tool {
 	return mcp.NewTool(
-		"deploy_machine",
+		"deploy-machine",
 		mcp.WithString(
 			"machineId",
 			mcp.Required(),

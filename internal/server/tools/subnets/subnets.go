@@ -28,7 +28,7 @@ type ListSubnets struct{}
 
 func (ListSubnets) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_subnets",
+		"list-subnets",
 		mcp.WithInputSchema[struct{}](),
 		mcp.WithToolAnnotation(tools.CreateToolAnnotation("List Subnets", true, false, false, true)),
 		mcp.WithDescription("Returns all subnets that are currently defined on the running instance of MAAS."),
@@ -63,7 +63,7 @@ type CreateSubnet struct{}
 
 func (CreateSubnet) Create() mcp.Tool {
 	return mcp.NewTool(
-		"create_subnet",
+		"create-subnet",
 		mcp.WithToolAnnotation(tools.CreateToolAnnotation("Create Subnet", false, true, false, true)),
 		mcp.WithString(
 			"cidr",

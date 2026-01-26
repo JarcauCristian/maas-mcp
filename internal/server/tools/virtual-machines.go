@@ -29,7 +29,7 @@ type ListVMHosts struct{}
 
 func (ListVMHosts) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_vm_hosts",
+		"list-vm-hosts",
 		mcp.WithDescription("Returns the available VM hosts from the ZTP agent conected."),
 	)
 }
@@ -63,7 +63,7 @@ type ListVMHost struct{}
 
 func (ListVMHost) Create() mcp.Tool {
 	return mcp.NewTool(
-		"list_vm_host",
+		"list-vm-host",
 		mcp.WithString(
 			"id",
 			mcp.Required(),
@@ -109,7 +109,7 @@ type ComposeVM struct{}
 
 func (ComposeVM) Create() mcp.Tool {
 	return mcp.NewTool(
-		"compose_vm_host",
+		"compose-vm-host",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

@@ -297,6 +297,20 @@ func extractVMData(machine map[string]any) (vmData map[string]any, podId string,
 		return nil, "", false
 	}
 
+	memory, ok := machine["memory"]
+	if !ok {
+		return nil, "", false
+	}
+
+	storage, ok := machine["storage"]
+	if !ok {
+		return nil, "", false
+	}
+	cpuCount, ok := machine["cpu_count"]
+	if !ok {
+		return nil, "", false
+	}
+
 	hostname, ok := machine["hostname"]
 	if !ok {
 		return nil, "", false
@@ -324,6 +338,9 @@ func extractVMData(machine map[string]any) (vmData map[string]any, podId string,
 		"virtualmachine_id": vmId,
 		"system_id":         systemId,
 		"status":            strings.ToLower(status_name.(string)),
+		"cpu_count":         cpuCount,
+		"memory":            memory,
+		"storage":           storage,
 	}
 
 	return vmData, podId, true

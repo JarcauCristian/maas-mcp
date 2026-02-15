@@ -7,7 +7,7 @@ declare -gA settings=(
 )
 
 create_system_account() {
-  local account_dir = "/var/lib/${settings[ACCOUNT_NAME]}"
+  local account_dir="/var/lib/${settings[ACCOUNT_NAME]}"
 
   useradd -r -m -d "$account_dir" -s /bin/bash "${settings[ACCOUNT_NAME]}"
   usermod -aG sudo "${settings[ACCOUNT_NAME]}"
@@ -53,7 +53,7 @@ push_to_vault() {
 main() {
   create_system_account || exit $?
   create_ssh_key || exit $?
-  ensure_vault || exit $?
+  ensure_vault_cli || exit $?
   push_to_vault || exit $?
 }
 

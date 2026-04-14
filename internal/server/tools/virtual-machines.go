@@ -109,7 +109,7 @@ type ComposeVM struct{}
 
 func (ComposeVM) Create() mcp.Tool {
 	return mcp.NewTool(
-		"compose-vm-host",
+		"compose-vm",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

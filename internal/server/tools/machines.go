@@ -220,7 +220,7 @@ type WaitForMachineStatus struct{}
 
 func (WaitForMachineStatus) Create() mcp.Tool {
 	return mcp.NewTool(
-		"wait-for-machine-status-deployed",
+		"wait-for-machine-status",
 		mcp.WithString(
 			"id",
 			mcp.Required(),

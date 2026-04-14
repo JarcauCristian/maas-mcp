@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/JarcauCristian/ztp-mcp/internal/server/maas_client"
 	"github.com/JarcauCristian/ztp-mcp/internal/server/parser"
@@ -41,7 +42,7 @@ var statuses = []string{
 type Machines struct{}
 
 func (Machines) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineStatus{}, GetMachineIp{}, CommissionMachine{}, DeployMachine{}}
+	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineStatus{}, GetMachineIp{}, CommissionMachine{}, DeployMachine{}, WaitForMachineStatus{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)
@@ -213,6 +214,108 @@ func (ListMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*mc
 	}
 
 	return mcp.NewToolResultText(string(response)), nil
+}
+
+type WaitForMachineStatus struct{}
+
+func (WaitForMachineStatus) Create() mcp.Tool {
+	return mcp.NewTool(
+		"wait-for-machine-status-deployed",
+		mcp.WithString(
+			"id",
+			mcp.Required(),
+			mcp.Pattern("^[0-9a-z]{6}$"),
+			mcp.Description("The id of the machine to commission."),
+		),
+		mcp.WithString(
+			"status",
+			mcp.Enum(
+				"new",
+				"commissioning",
+				"failed_commissioning",
+				"ready",
+				"deploying",
+				"deployed",
+				"releasing",
+				"failed_deployment",
+				"allocated",
+				"retired",
+				"broken",
+				"recommissioning",
+				"testing",
+				"failed_testing",
+				"rescuing",
+				"disk_erasing",
+				"failed_disk_erasing",
+			),
+			mcp.DefaultString("deployed"),
+			mcp.Description("The status of the machine to wait for."),
+		),
+		mcp.WithNumber(
+			"timeout",
+			mcp.DefaultNumber(120.0),
+			mcp.Description("Timeout until the waiting is stoped. Default: 120s"),
+		),
+		mcp.WithDescription("Retrieve the status of the machine specified by id."),
+	)
+}
+
+func (WaitForMachineStatus) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var errMsg string
+
+	machineID, err := request.RequireString("id")
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("[WaitForMachineStatus] Required parameter id not present err=%v", err))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	timeout := request.GetFloat("timeout", 120.0)
+	requiredStatus := request.GetString("status", "deployed")
+
+	path := fmt.Sprintf("/MAAS/api/2.0/machines/%s/", machineID)
+	client := maas_client.MustClient()
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+	defer cancel()
+
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			errMsg = fmt.Sprintf("Timeout reached while waiting for machine %s to reach status %s", machineID, requiredStatus)
+			zap.L().Error(fmt.Sprintf("[WaitForMachineStatus] %s", errMsg))
+			return mcp.NewToolResultError(errMsg), nil
+
+		case <-ticker.C:
+			machineRaw, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
+			if err != nil {
+				errMsg = fmt.Sprintf("Failed to retrieve the machine with id %s err=%v", machineID, err)
+				zap.L().Error(fmt.Sprintf("[WaitForMachineStatus] %s", errMsg))
+				return mcp.NewToolResultError(errMsg), nil
+			}
+
+			var machine map[string]any
+			if err := json.Unmarshal([]byte(machineRaw), &machine); err != nil {
+				errMsg = fmt.Sprintf("Failed to unmarshal the result: %v", err)
+				zap.L().Error(fmt.Sprintf("[WaitForMachineStatus] %s", errMsg))
+				return mcp.NewToolResultError(errMsg), nil
+			}
+
+			statusName, ok := machine["status_name"].(string)
+			if !ok {
+				errMsg = fmt.Sprintf("Failed to get status_name for machine %s", machineID)
+				zap.L().Error(fmt.Sprintf("[WaitForMachineStatus] %s", errMsg))
+				return mcp.NewToolResultError(errMsg), nil
+			}
+
+			if statusName == requiredStatus {
+				zap.L().Info(fmt.Sprintf("[WaitForMachineStatus] Machine %s reached status %s", machineID, requiredStatus))
+				return mcp.NewToolResultText(fmt.Sprintf("Machine reached status: %s", statusName)), nil
+			}
+		}
+	}
 }
 
 type GetMachineStatus struct{}

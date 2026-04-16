@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -42,7 +43,7 @@ var statuses = []string{
 type Machines struct{}
 
 func (Machines) Register(mcpServer *server.MCPServer) {
-	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineStatus{}, GetMachineIp{}, CommissionMachine{}, DeployMachine{}, WaitForMachineStatus{}}
+	mcpTools := []MCPTool{ListMachines{}, ListMachine{}, GetMachineDetails{}, GetMachineStatus{}, GetMachineIp{}, GetMachineScriptResults{}, CommissionMachine{}, DeployMachine{}, WaitForMachineStatus{}}
 
 	for _, tool := range mcpTools {
 		mcpServer.AddTool(tool.Create(), tool.Handle)
@@ -368,6 +369,125 @@ func (GetMachineStatus) Handle(ctx context.Context, request mcp.CallToolRequest)
 	}
 
 	return mcp.NewToolResultText(fmt.Sprintf(`{"status": "%s"}`, statusName)), nil
+}
+
+type GetMachineDetails struct{}
+
+func (GetMachineDetails) Create() mcp.Tool {
+	return mcp.NewTool(
+		"get-machine-details",
+		mcp.WithString(
+			"id",
+			mcp.Required(),
+			mcp.Pattern("^[0-9a-z]{6}$"),
+			mcp.Description("The id of the machine to retrieve the details."),
+		),
+		mcp.WithDescription("Retrieve the details in XML format of the machine specified by id."),
+	)
+}
+
+func (GetMachineDetails) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	machineID, err := request.RequireString("id")
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("[GetMachineDetails] Required parameter id not present err=%v", err))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	path := fmt.Sprintf("/MAAS/api/2.0/machines/%s/op-details", machineID)
+	client := maas_client.MustClient()
+
+	response, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to retrieve the details of the machine with id %s err=%v", machineID, err)
+		zap.L().Error(fmt.Sprintf("[GetMachineDetails] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	return mcp.NewToolResultText(response), nil
+}
+
+type GetMachineScriptResults struct{}
+
+func (GetMachineScriptResults) Create() mcp.Tool {
+	return mcp.NewTool(
+		"get-machine-script-results",
+		mcp.WithString(
+			"id",
+			mcp.Required(),
+			mcp.Pattern("^[0-9a-z]{6}$"),
+			mcp.Description("The id of the machine to retrieve the commissioning results."),
+		),
+		mcp.WithDescription("Retrieve the commissioning script results for a machine."),
+	)
+}
+
+func (GetMachineScriptResults) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	var errMsg string
+	machineID, err := request.RequireString("id")
+	if err != nil {
+		zap.L().Error(fmt.Sprintf("[GetMachineScriptResults] Required parameter id not present err=%v", err))
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	path := fmt.Sprintf("/MAAS/api/2.0/installation-results/?system_id=%s", machineID)
+	client := maas_client.MustClient()
+
+	zap.L().Info(fmt.Sprintf("[GetMachineScriptResults] Retrieving commissioning script results for machine with id %s...", machineID))
+	resultData, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
+	if err != nil {
+		errMsg = fmt.Sprintf("Failed to retrieve commissioning results for machine with id %s err=%v", machineID, err)
+		zap.L().Error(fmt.Sprintf("[GetMachineScriptResults] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	var rawScripts []map[string]any
+	if err := json.Unmarshal([]byte(resultData), &rawScripts); err != nil {
+		errMsg = fmt.Sprintf("Failed to unmarshal commissioning results: %v", err)
+		zap.L().Error(fmt.Sprintf("[GetMachineScriptResults] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	var scripts []CommissioningScript
+	for _, raw := range rawScripts {
+		systemID := ""
+		if node, ok := raw["node"].(map[string]any); ok {
+			if sid, ok := node["system_id"].(string); ok {
+				systemID = sid
+			}
+		}
+
+		data := ""
+		if d, ok := raw["data"].(string); ok && d != "" {
+			decoded, err := base64.StdEncoding.DecodeString(d)
+			if err != nil {
+				zap.L().Warn(fmt.Sprintf("[GetMachineScriptResults] Failed to decode base64 data for script %s: %v", raw["name"], err))
+				data = d
+			} else {
+				data = string(decoded)
+			}
+		}
+
+		script := CommissioningScript{
+			ID:           parser.GetInt(raw, "id"),
+			Name:         parser.GetString(raw, "name"),
+			ScriptResult: parser.GetInt(raw, "script_result"),
+			ResultType:   parser.GetInt(raw, "result_type"),
+			SystemID:     systemID,
+			Data:         data,
+			Created:      parser.GetString(raw, "created"),
+			Updated:      parser.GetString(raw, "updated"),
+		}
+		scripts = append(scripts, script)
+	}
+
+	response, err := json.Marshal(scripts)
+	if err != nil {
+		errMsg = fmt.Sprintf("Failed to marshal commissioning scripts: %v", err)
+		zap.L().Error(fmt.Sprintf("[GetMachineScriptResults] %s", errMsg))
+		return mcp.NewToolResultError(errMsg), nil
+	}
+
+	return mcp.NewToolResultText(string(response)), nil
 }
 
 type GetMachineIp struct{}

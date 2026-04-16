@@ -59,3 +59,14 @@ type Partition struct {
 	FSType     string `json:"fstype,omitempty"`
 	MountPoint string `json:"mount_point,omitempty"`
 }
+
+type CommissioningScript struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	ScriptResult int    `json:"script_result"`
+	ResultType   int    `json:"result_type"`
+	SystemID     string `json:"system_id"`
+	Data         string `json:"data"`
+	Created      string `json:"created"`
+	Updated      string `json:"updated"`
+}

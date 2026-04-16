@@ -38,6 +38,7 @@ func registerTools(mcpServer *server.MCPServer) {
 	registries := []registry.Registry{
 		tools.VMHosts{},
 		tools.Machines{},
+		tools.Events{},
 		tools.Power{},
 		tools.Templates{},
 		tags.Tags{},

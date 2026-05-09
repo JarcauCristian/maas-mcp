@@ -68,6 +68,7 @@ func (GetEvents) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	after := request.GetString("after", "")
 
 	query := url.Values{}
+	query.Add("op", "query")
 	query.Add("limit", fmt.Sprintf("%.0f", limit))
 
 	if level != "" {

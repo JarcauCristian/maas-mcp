@@ -157,12 +157,12 @@ func (UpdateTag) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	}
 
 	comment := request.GetString("comment", "")
-	if newName != "" {
+	if comment != "" {
 		form.Add("comment", comment)
 	}
 
 	definition := request.GetString("definition", "")
-	if newName != "" {
+	if definition != "" {
 		form.Add("definition", definition)
 	}
 

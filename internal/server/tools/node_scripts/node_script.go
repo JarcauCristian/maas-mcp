@@ -333,7 +333,7 @@ func (AddTagToNodeScript) Handle(ctx context.Context, request mcp.CallToolReques
 		form.Add("tag", tag)
 	}
 
-	path := fmt.Sprintf("/MAAS/api/2.0/scripts/%sop-add_tag", scriptName)
+	path := fmt.Sprintf("/MAAS/api/2.0/scripts/%s/op-add_tag", scriptName)
 
 	client := maas_client.MustClient()
 
@@ -384,7 +384,7 @@ func (DownloadNodeScript) Handle(ctx context.Context, request mcp.CallToolReques
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	path := fmt.Sprintf("/MAAS/api/2.0/scripts/%sop-download", scriptName)
+	path := fmt.Sprintf("/MAAS/api/2.0/scripts/%s/op-download", scriptName)
 
 	if revision := request.GetString("revision", ""); revision != "" {
 		queryParams := url.Values{}
@@ -438,7 +438,7 @@ func (RemoveTagFromNodeScript) Handle(ctx context.Context, request mcp.CallToolR
 		form.Add("tag", tag)
 	}
 
-	path := fmt.Sprintf("/MAAS/api/2.0/scripts/%sop-remove_tag", scriptName)
+	path := fmt.Sprintf("/MAAS/api/2.0/scripts/%s/op-remove_tag", scriptName)
 
 	client := maas_client.MustClient()
 

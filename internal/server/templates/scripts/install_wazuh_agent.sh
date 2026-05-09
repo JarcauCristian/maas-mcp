@@ -3,7 +3,7 @@
 set -euo pipefail
 
 install_wazuh_agent() {
-  local wazuh_manager={{ .WazuhManger }}
+  local wazuh_manager={{ .WazuhManager }}
   local wazuh_agent_group={{ .WazuhAgentGroup }}
   local machine_id={{ .MachineId }}
 

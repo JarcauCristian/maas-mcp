@@ -99,6 +99,11 @@ func (ReadTag) Handle(ctx context.Context, request mcp.CallToolRequest) (*mcp.Ca
 
 	resultData, err := client.Do(ctx, maas_client.RequestTypeGet, path, nil)
 	if err != nil {
+		if strings.Contains(err.Error(), "status 404") {
+			notFound, _ := json.Marshal(map[string]any{"exists": false, "name": name})
+			zap.L().Info(fmt.Sprintf("[ReadTag] Tag %s not found", name))
+			return mcp.NewToolResultText(string(notFound)), nil
+		}
 		errMsg = fmt.Sprintf("Failed to read tag %s err=%v", name, err)
 		zap.L().Error(fmt.Sprintf("[ReadTag] %s", errMsg))
 		return mcp.NewToolResultError(errMsg), nil

@@ -9,7 +9,8 @@ MACHINE_ID="{{ .MachineId }}"
 install_osquery() {
   mkdir -p /etc/apt/keyrings
   curl -L https://pkg.osquery.io/deb/pubkey.gpg | tee /etc/apt/keyrings/osquery.asc >/dev/null
-  add-apt-repository -y 'deb [arch=amd64 signed-by=/etc/apt/keyrings/osquery.asc] https://pkg.osquery.io/deb deb main'
+  echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/osquery.asc] https://pkg.osquery.io/deb deb main' \
+    > /etc/apt/sources.list.d/osquery.list
   apt-get update -qq
   apt-get install -y osquery
 }

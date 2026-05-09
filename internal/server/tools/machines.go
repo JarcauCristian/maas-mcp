@@ -20,6 +20,25 @@ import (
 	"go.uber.org/zap"
 )
 
+func coerceJSONStringArg(rawArguments any, name string) (string, error) {
+	args, ok := rawArguments.(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("arguments payload is not an object")
+	}
+	value, present := args[name]
+	if !present || value == nil {
+		return "", fmt.Errorf("required argument %q missing", name)
+	}
+	if s, ok := value.(string); ok {
+		return s, nil
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return "", fmt.Errorf("argument %q could not be encoded: %w", name, err)
+	}
+	return string(encoded), nil
+}
+
 var statuses = []string{
 	"new",
 	"commissioning",
@@ -686,9 +705,9 @@ func (DeployMachine) Handle(ctx context.Context, request mcp.CallToolRequest) (*
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 
-	parameters, err := request.RequireString("templateParameters")
+	parameters, err := coerceJSONStringArg(request.Params.Arguments, "templateParameters")
 	if err != nil {
-		zap.L().Error(fmt.Sprintf("[DeployMachine] Required parameter templateParameters not present err=%v", err))
+		zap.L().Error(fmt.Sprintf("[DeployMachine] Required parameter templateParameters invalid err=%v", err))
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 

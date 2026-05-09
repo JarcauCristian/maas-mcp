@@ -311,7 +311,7 @@ func (WaitForMachineStatus) Handle(ctx context.Context, request mcp.CallToolRequ
 				return mcp.NewToolResultError(errMsg), nil
 			}
 
-			if statusName == requiredStatus {
+			if strings.EqualFold(statusName, requiredStatus) {
 				zap.L().Info(fmt.Sprintf("[WaitForMachineStatus] Machine %s reached status %s", machineID, requiredStatus))
 				return mcp.NewToolResultText(fmt.Sprintf("Machine reached status: %s", statusName)), nil
 			}
